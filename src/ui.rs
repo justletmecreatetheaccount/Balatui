@@ -2,37 +2,80 @@ use ratatui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     prelude::*,
-    symbols::border,
     style::{Color, Style},
+    symbols::border,
     text::Text,
-    widgets::{Block, Borders, Paragraph, block::*},
+    widgets::{
+        block::*, Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
+    },
     Frame,
 };
-use std::rc::Rc;
+use std::{cmp, rc::Rc};
 
 use crate::app::{App, AppState};
 
-pub fn ui(f: &mut Frame, app: &mut App, needed_previews : i8) {
+pub fn ui(f: &mut Frame, app: &mut App) {
+    //Matches apps current state and displays accordingly
     match app.state {
-        AppState::MainScreen => { //TEMPORARY
-            let outer_layout = Layout::default()
+        AppState::MainScreen => {
+            //Define the 2 big blocks (content and title)
+            let vertical_layout = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints(vec![
-                             Constraint::Length(3),
-                             Constraint::Min(7),
-                             Constraint::Min(7),
-                             Constraint::Min(7),
-                ])
+                .constraints(vec![Constraint::Length(3), Constraint::Fill(1)])
                 .split(f.size());
 
-            let lvls_layout : Vec<Rc<[Rect]>> = (1..4).map(|i| Layout::default()
-                                                    .direction(Direction::Horizontal)
-                                                    .constraints(vec![
-                                                                 Constraint::Min(12),
-                                                                 Constraint::Min(12),
-                                                                 Constraint::Min(12),
-                                                    ])
-                                                    .split(outer_layout[i])).collect();
+            //Update scrollbar position
+            if app.selected_deck_index < app.scrollbar_position * 3 {
+                app.scrollbar_position -= 1;
+            }
+
+            if app.selected_deck_index
+                > app.scrollbar_position * 3 + vertical_layout[1].height as usize - 1
+            {
+                app.scrollbar_position += 1;
+            }
+
+            //Create the scrollbar
+            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
+
+            let mut scrollbar_state = ScrollbarState::new(
+                (cmp::max(
+                    (app.number_of_decks as f32 / 3.0).ceil() as i32
+                        - (vertical_layout[1].height / 3) as i32
+                        + 1,
+                    1,
+                )) as usize,
+            )
+            .position(app.scrollbar_position)
+            .viewport_content_length((vertical_layout[1].height / 3 + 1) as usize);
+
+            let mut constraints = Vec::new();
+
+            for _i in 0..cmp::min(
+                (app.number_of_decks as f32 / 3.0).ceil() as u16,
+                (vertical_layout[1].height as f32 / 3.0).ceil() as u16,
+            ) as usize
+            {
+                constraints.push(Constraint::Length(3))
+            }
+
+            let sub_vertical_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(constraints)
+                .split(vertical_layout[1]);
+
+            let horizontal_layout: Vec<Rc<[Rect]>> = (0..sub_vertical_layout.len())
+                .map(|i| {
+                    Layout::default()
+                        .direction(Direction::Horizontal)
+                        .constraints(vec![
+                            Constraint::Percentage(100 / 3),
+                            Constraint::Percentage(100 / 3),
+                            Constraint::Percentage(100 / 3),
+                        ])
+                        .split(sub_vertical_layout[i as usize])
+                })
+                .collect();
 
             let title_block = Block::default()
                 .borders(Borders::ALL)
@@ -40,19 +83,19 @@ pub fn ui(f: &mut Frame, app: &mut App, needed_previews : i8) {
                 .style(Style::default());
 
             let title = Paragraph::new(Text::styled(
-                    "Your FlashCards",
-                    Style::default().fg(Color::Red),
-                    ))
-                .alignment(Alignment::Center)
-                .block(title_block);
+                "Your FlashCards",
+                Style::default().fg(Color::Red),
+            ))
+            .alignment(Alignment::Center)
+            .block(title_block);
 
-            let mut previews_number = 0;
-
-            for lvl in lvls_layout {
+            //The rendering block
+            for j in 0..cmp::min(
+                sub_vertical_layout.len(),
+                (vertical_layout[1].height as f32 / 3.0).ceil() as usize,
+            ) {
                 for i in 0..3 {
-                    previews_number += 1;
-
-                    if previews_number <= needed_previews {
+                    if app.scrollbar_position * 3 + j * 3 + i < app.number_of_decks {
                         let preview_title = Title::from("TODO");
 
                         let preview_block = Block::default()
@@ -60,18 +103,105 @@ pub fn ui(f: &mut Frame, app: &mut App, needed_previews : i8) {
                             .border_set(border::ROUNDED)
                             .title(preview_title.alignment(Alignment::Center));
 
-                        let preview_contents = Paragraph::new(Text::styled("TODOTO", Style::default()))
+                        if app.scrollbar_position * 3 + j * 3 + i
+                            == app.selected_deck_index as usize
+                        {
+                            let preview_block = preview_block.border_style(Style::new().red());
+
+                            let preview_contents = Paragraph::new(Text::styled(
+                                format!("Nbr : {}", app.scrollbar_position * 3 + j * 3 + i),
+                                Style::default(),
+                            ))
                             .alignment(Alignment::Center)
                             .block(preview_block);
-                        f.render_widget(preview_contents, lvl[i]);
+                            f.render_widget(preview_contents, horizontal_layout[j][i]);
+                        } else {
+                            let preview_contents = Paragraph::new(Text::styled(
+                                format!("Nbr : {}", app.scrollbar_position * 3 + j * 3 + i),
+                                Style::default(),
+                            ))
+                            .alignment(Alignment::Center)
+                            .block(preview_block);
+                            f.render_widget(preview_contents, horizontal_layout[j][i]);
+                        }
                     }
                 }
             }
 
-            f.render_widget(title, outer_layout[0]);},
+            f.render_widget(title, vertical_layout[0]);
+            f.render_stateful_widget(
+                scrollbar,
+                vertical_layout[1].inner(&Margin {
+                    vertical: 1,
+                    horizontal: 0,
+                }),
+                &mut scrollbar_state,
+            )
+        }
+        AppState::Editing => {
+            //TEMPORARY
+            let vertical_layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(vec![
+                    Constraint::Length(3),
+                    Constraint::Min(7),
+                    Constraint::Min(7),
+                    Constraint::Min(7),
+                ])
+                .split(f.size());
+
+            let horizontal_layout: Vec<Rc<[Rect]>> = (1..4)
+                .map(|i| {
+                    Layout::default()
+                        .direction(Direction::Horizontal)
+                        .constraints(vec![
+                            Constraint::Min(12),
+                            Constraint::Min(12),
+                            Constraint::Min(12),
+                        ])
+                        .split(vertical_layout[i])
+                })
+                .collect();
+
+            let title_block = Block::default()
+                .borders(Borders::ALL)
+                .border_set(border::THICK)
+                .style(Style::default());
+
+            let title = Paragraph::new(Text::styled(
+                "Your FlashCards",
+                Style::default().fg(Color::Red),
+            ))
+            .alignment(Alignment::Center)
+            .block(title_block);
+
+            let mut previews_number = 0;
+
+            for layout in horizontal_layout {
+                for i in 0..3 {
+                    previews_number += 1;
+
+                    if previews_number <= app.number_of_decks {
+                        let preview_title = Title::from("TODO");
+
+                        let preview_block = Block::default()
+                            .borders(Borders::ALL)
+                            .border_set(border::ROUNDED)
+                            .title(preview_title.alignment(Alignment::Center));
+
+                        let preview_contents =
+                            Paragraph::new(Text::styled("TODOTO", Style::default()))
+                                .alignment(Alignment::Center)
+                                .block(preview_block);
+                        f.render_widget(preview_contents, layout[i]);
+                    }
+                }
+            }
+
+            f.render_widget(title, vertical_layout[0]);
+        }
 
         AppState::NewConfig => {
-
             let span = Span::raw("> ");
             let content_span = Span::raw(&app.input_buffer);
             let popup_title = Title::from("Where to store flashcards");
@@ -80,18 +210,25 @@ pub fn ui(f: &mut Frame, app: &mut App, needed_previews : i8) {
                 .borders(Borders::ALL)
                 .style(Style::default())
                 .title(popup_title.alignment(Alignment::Center));
-            let popup_contents = Paragraph::new(Text::from(Line::from(vec![span, content_span])))
-                .block(popup_block);
+            let popup_contents =
+                Paragraph::new(Text::from(Line::from(vec![span, content_span]))).block(popup_block);
             f.render_widget(popup_contents, popup_area);
             //Cursor positioning
-            app.input_buffer_max_size = popup_area.width - 5;
-            f.set_cursor(popup_area.x + 3 + app.cursor_position, popup_area.y + 1);
-
+            app.input_buffer_max_size = (popup_area.width - 5) as usize;
+            f.set_cursor(
+                popup_area.x + 3 + app.cursor_position as u16,
+                popup_area.y + 1,
+            );
         }
         _ => todo!(),
     }
 }
 
+/*
+Takes 2 integers defining the proportional width and height
+compared to the terminal height.
+
+*/
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     // Cut the given rectangle into three vertical pieces
     let popup_layout = Layout::default()
