@@ -1,6 +1,6 @@
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use dirs;
-use ratatui::{backend::Backend, Terminal};
+use ratatui::{backend::Backend, layout::Margin, Terminal};
 use std::{
     fs::{self, File, ReadDir},
     io::{self, Error, ErrorKind, Write},
@@ -26,6 +26,8 @@ Test the user with the cards
 pub enum AppState {
     MainScreen,
     NewConfig,
+    SelectCard,
+    NewDeck, //TODO
     Editing, //TODO
     Testing, //TODO
 }
@@ -38,7 +40,7 @@ pub struct App {
     exit: bool,
 
     config_path: PathBuf,
-    cards_path: Option<ReadDir>,
+    decks_path: Option<String>,
     pub number_of_decks: usize,
 
     pub input_buffer: String,
@@ -47,6 +49,7 @@ pub struct App {
 
     pub scrollbar_position: usize,
     pub selected_deck_index: usize,
+    pub selected_card_index: usize,
 }
 
 impl App {
@@ -60,13 +63,14 @@ impl App {
                 state: AppState::MainScreen,
                 exit: false,
                 config_path: home_dir,
-                cards_path: None,
-                number_of_decks: 44,
+                decks_path: None,
+                number_of_decks: 69,
                 input_buffer: String::from(""),
                 input_buffer_max_size: 0,
                 cursor_position: 0,
                 scrollbar_position: 0,
                 selected_deck_index: 0,
+                selected_card_index: 0,
             };
             Ok(app)
         } else {
@@ -83,7 +87,7 @@ impl App {
                     Ok(())
                 } //Exit app
                 KeyCode::Char('n') => {
-                    self.state = AppState::Editing;
+                    self.state = AppState::NewDeck;
                     Ok(())
                 }
                 KeyCode::Left => {
@@ -93,13 +97,17 @@ impl App {
                     Ok(())
                 } //Navigate cards
                 KeyCode::Right => {
-                    if self.selected_deck_index < self.number_of_decks - 1 {
+                    if self.number_of_decks > 1
+                        && self.selected_deck_index < self.number_of_decks - 1
+                    {
                         self.selected_deck_index += 1;
                     }
                     Ok(())
                 } //Navigate cards
                 KeyCode::Down => {
-                    if self.selected_deck_index < self.number_of_decks - 3 {
+                    if self.number_of_decks > 3
+                        && self.selected_deck_index < self.number_of_decks - 3
+                    {
                         self.selected_deck_index += 3;
                     }
                     Ok(())
@@ -110,6 +118,10 @@ impl App {
                     }
                     Ok(())
                 } //Navigate cards
+                KeyCode::Enter => {
+                    self.state = AppState::SelectCard;
+                    Ok(())
+                }
                 _ => Ok(()),
             },
 
@@ -144,16 +156,60 @@ impl App {
                 }
                 _ => Ok(()),
             },
+            AppState::Testing => match key_event.code {
+                _ => Ok(()),
+            },
+            AppState::SelectCard => match key_event.code {
+                KeyCode::Char('q') => {
+                    self.state = AppState::MainScreen;
+                    Ok(())
+                } //Exit SelectCard Mode
+                KeyCode::Left => {
+                    if self.selected_card_index > 0 {
+                        self.selected_card_index -= 1;
+                    }
+                    Ok(())
+                } //Navigate cards
+                KeyCode::Right => {
+                    if self.selected_card_index < self.number_of_decks - 1 {
+                        self.selected_card_index += 1;
+                    }
+                    Ok(())
+                } //Navigate cards
+                KeyCode::Down => {
+                    if self.selected_card_index < self.number_of_decks - 3 {
+                        self.selected_card_index += 3;
+                    }
+                    Ok(())
+                } //Navigate cards
+                KeyCode::Up => {
+                    if self.selected_card_index > 2 {
+                        self.selected_card_index -= 3;
+                    }
+                    Ok(())
+                } //Navigate cards
+                KeyCode::Enter => {
+                    self.state = AppState::Editing;
+                    Ok(())
+                } //Select card for editing
+                KeyCode::Char('n') => {
+                    // Create New Card
+                    self.state = AppState::Editing;
+                    Ok(())
+                }
+                _ => Ok(()),
+            },
             _ => todo!(),
         }
     }
     //INPUT PARSING
+
     //MAIN LOOP
     pub fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
         //FIND CONFIG
         if self.config_path.exists() {
             let card_path_string = fs::read_to_string(&self.config_path)?;
-            self.cards_path = Some(fs::read_dir(card_path_string)?);
+            self.decks_path = Some(card_path_string);
         } else {
             self.state = AppState::NewConfig;
         }
@@ -178,9 +234,20 @@ impl App {
         self.exit = true;
     }
 
+    fn create_new_deck(&mut self) -> io::Result<()> {
+        if let Some(path) = &self.decks_path {
+            let new_file = File::create(format!("{path}/{}", self.input_buffer));
+        } else {
+        }
+        Ok(())
+    }
+
+    fn load_mainscreen_data(&mut self) {
+        todo!();
+    }
+
     fn edit_flashcards(&mut self) {
         //TOTOTOTODOOOOOOOOOOOOOOOOOOOOO
-        self.cards_path = Some(fs::read_dir("./").unwrap());
         todo!();
     }
 
@@ -190,7 +257,7 @@ impl App {
         if let Ok(mut config_file) = File::create(&self.config_path) {
             config_file.write_all(self.input_buffer.as_bytes())?;
             fs::create_dir_all(PathBuf::from(&self.input_buffer))?;
-            self.cards_path = Some(fs::read_dir(&self.input_buffer)?);
+            self.decks_path = Some(self.input_buffer.clone());
             Ok(())
         } else {
             Err(Error::new(
