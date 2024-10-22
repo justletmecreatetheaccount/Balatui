@@ -14,7 +14,7 @@ The enum AppState defines states of the app.
 Theses states define a state of operations an functions that the app
 should perform at that time
 
-MainScreen :
+SelectDeck :
 The first state that the user sees, can chose a deck
 NewConfig :
 Tell balatui to change it's config (ex. change deck location)
@@ -24,23 +24,22 @@ Testing :
 Test the user with the cards
 */
 pub enum AppState {
-    MainScreen,
-    NewConfig,
+    SelectDeck,
     SelectCard,
-    NewDeck, //TODO
     Editing, //TODO
     Testing, //TODO
 }
 /*
 Defines the app sturcture :
 AppState defines the state that the app is currently in
+All paths are stored as a PathBuf
   */
 pub struct App {
     pub state: AppState,
     exit: bool,
 
     config_path: PathBuf,
-    decks_path: Option<String>,
+    decks_path: Option<PathBuf>,
     pub number_of_decks: usize,
 
     pub input_buffer: String,
@@ -60,7 +59,7 @@ impl App {
             home_dir.push("balatui");
             home_dir.push("balatui.conf");
             app = Self {
-                state: AppState::MainScreen,
+                state: AppState::SelectDeck,
                 exit: false,
                 config_path: home_dir,
                 decks_path: None,
@@ -81,7 +80,7 @@ impl App {
     //INPUT PARSING
     fn key_event_manager(&mut self, key_event: KeyEvent) -> io::Result<()> {
         match self.state {
-            AppState::MainScreen => match key_event.code {
+            AppState::SelectDeck => match key_event.code {
                 KeyCode::Char('q') => {
                     self.exit();
                     Ok(())
@@ -149,7 +148,7 @@ impl App {
                 }
                 KeyCode::Enter => {
                     self.create_new_config()?;
-                    self.state = AppState::MainScreen;
+                    self.state = AppState::SelectDeck;
                     self.input_buffer = String::from("");
                     self.input_buffer_max_size = 0;
                     Ok(())
@@ -161,7 +160,7 @@ impl App {
             },
             AppState::SelectCard => match key_event.code {
                 KeyCode::Char('q') => {
-                    self.state = AppState::MainScreen;
+                    self.state = AppState::SelectDeck;
                     Ok(())
                 } //Exit SelectCard Mode
                 KeyCode::Left => {

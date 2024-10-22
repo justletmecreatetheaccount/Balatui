@@ -1,7 +1,8 @@
 use std::io;
 
-mod ter;
 mod app;
+mod rope;
+mod ter;
 mod ui;
 
 fn main() -> Result<(), io::Error> {

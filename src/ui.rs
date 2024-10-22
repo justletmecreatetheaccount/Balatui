@@ -17,7 +17,7 @@ use crate::app::{App, AppState};
 pub fn ui(f: &mut Frame, app: &mut App) {
     //Matches apps current state and displays accordingly
     match app.state {
-        AppState::MainScreen => {
+        AppState::SelectDeck => {
             //Define the 2 big blocks (content and title)
             let vertical_layout = Layout::default()
                 .direction(Direction::Vertical)
