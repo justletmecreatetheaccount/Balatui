@@ -6,7 +6,7 @@ mod ter;
 mod ui;
 
 fn main() -> Result<(), io::Error> {
-    //creates a new terminal instance
+    //creates a new crossterm terminal instance
     let mut terminal = ter::new()?;
     //creates a new app instance (see app.rs for more info)
     if let Ok(mut app) = app::App::new() {
