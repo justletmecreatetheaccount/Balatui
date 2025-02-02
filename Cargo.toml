@@ -6,7 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+color-eyre = "=0.6.3"
 crossterm = "0.27.0"
 dirs = "5.0.1"
-ratatui = { version = "=0.26.0", features = ["all-widgets"] }
+ratatui = "0.29.0"
 ratatui-image = "2.0.1"
