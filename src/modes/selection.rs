@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{cmp::min_by, str::FromStr};
 
 use crate::{
     app::{Message, Mode},
@@ -9,7 +9,10 @@ use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
     style::Color,
-    widgets::{Block, Paragraph, Widget},
+    widgets::{
+        Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget,
+        Widget,
+    },
 };
 
 enum SelectionPopupTypes {
@@ -29,10 +32,16 @@ impl SelectionApp {
     pub fn new() -> SelectionApp {
         SelectionApp {
             cursor_position: 0,
-            number_of_elements: 10,
+            number_of_elements: 13,
             n_columns: 3,
             n_lines: 3,
-            elements: vec![String::from_str("DONTNOwWHATPURPOSE").unwrap()],
+            elements: {
+                let mut temp: Vec<String> = vec![];
+                for i in 0..13 {
+                    temp.push(format!("number : {}", i));
+                }
+                temp
+            },
             current_popup: None,
         }
     }
@@ -120,13 +129,45 @@ impl SelectionApp {
 impl Widget for &SelectionApp {
     fn render(self, area: Rect, buf: &mut Buffer) {
         // Render Selection app
+        let [viewport, scrollbar_area] =
+            Layout::horizontal(vec![Constraint::Min(0), Constraint::Length(1)]).areas(area); // To simplify scrollbar implementation
+
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(Some("^"))
+            .end_symbol(Some("v"));
+
+        let scrollbar_position = ((((self.cursor_position + 1) / self.n_columns)
+            + min_by(
+                (self.cursor_position + 1) % self.n_columns,
+                1,
+                |x: &u32, y: &u32| x.cmp(&y),
+            ))
+        .checked_sub(self.n_lines)
+        .or(Some(0))
+        .unwrap()) as usize;
+
+        let mut scrollbar_state = ScrollbarState::new(
+            (((self.number_of_elements / self.n_columns)
+                + min_by(
+                    self.number_of_elements % self.n_columns,
+                    1,
+                    |x: &u32, y: &u32| x.cmp(&y),
+                ))
+            .checked_sub(self.n_lines)
+            .or(Some(0))
+            .unwrap()
+                + 1) as usize,
+        )
+        .position(scrollbar_position);
+
+        scrollbar.render(scrollbar_area, buf, &mut scrollbar_state);
 
         let vertical_layout =
             Layout::vertical(vec![
                 Constraint::Percentage((100 / self.n_lines) as u16);
                 self.n_lines as usize
             ])
-            .split(area);
+            .split(viewport);
 
         for i in 0..self.n_lines {
             let horizontal_layout =
@@ -136,15 +177,28 @@ impl Widget for &SelectionApp {
                 ])
                 .split(vertical_layout[i as usize]);
             for j in 0..self.n_columns {
-                if self.number_of_elements < i * self.n_lines + j + 1 {
+                if self.number_of_elements
+                    < scrollbar_position as u32 * self.n_columns + i * self.n_lines + j + 1
+                {
                     break;
                 }
                 let element;
-                if self.cursor_position == i * self.n_lines + j {
-                    element =
-                        Paragraph::new("{i+j}").block(Block::bordered().border_style(Color::Red));
+                if self.cursor_position
+                    == scrollbar_position as u32 * self.n_columns + i * self.n_lines + j
+                {
+                    element = Paragraph::new(
+                        self.elements[scrollbar_position * self.n_columns as usize
+                            + (i * self.n_columns + j) as usize]
+                            .as_str(),
+                    )
+                    .block(Block::bordered().border_style(Color::Red));
                 } else {
-                    element = Paragraph::new("{i+j}").block(Block::bordered());
+                    element = Paragraph::new(
+                        self.elements[scrollbar_position * self.n_columns as usize
+                            + (i * self.n_columns + j) as usize]
+                            .as_str(),
+                    )
+                    .block(Block::bordered());
                 }
                 element.render(horizontal_layout[j as usize], buf);
             }
@@ -153,7 +207,7 @@ impl Widget for &SelectionApp {
         // Render eventual popup over this
         if self.current_popup.is_some() {
             self.current_popup.as_ref().unwrap().render(
-                Popup::<SelectionPopupTypes>::make_centered_rectangle_area(30, 30, area),
+                Popup::<SelectionPopupTypes>::make_centered_rectangle_area(30, 30, viewport),
                 buf,
             );
         }
