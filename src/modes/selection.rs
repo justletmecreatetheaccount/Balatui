@@ -36,6 +36,7 @@ impl SelectionApp {
             n_columns: 3,
             n_lines: 3,
             elements: {
+                // Needs rework obviously
                 let mut temp: Vec<String> = vec![];
                 for i in 0..13 {
                     temp.push(format!("number : {}", i));

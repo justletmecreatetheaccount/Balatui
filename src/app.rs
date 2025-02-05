@@ -17,7 +17,7 @@ pub struct App {
     selection_mode: SelectionApp,
     edit_mode: EditApp,
     testing_mode: TestingApp,
-    cards_path: PathBuf,
+    cards_path: Option<PathBuf>,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -40,6 +40,10 @@ pub enum Message {
 }
 
 impl App {
+    fn get_cards_path() -> Option<PathBuf> {
+        todo!()
+    }
+
     pub fn new() -> Result<App> {
         let read_cards_path: Option<String> = None; //Read cards path form file
         Ok(App {
@@ -47,7 +51,7 @@ impl App {
             selection_mode: SelectionApp::new(),
             edit_mode: EditApp::new(),
             testing_mode: TestingApp::new(),
-            cards_path: PathBuf::from_str("TEMPORARY").unwrap(), //To rework
+            cards_path: None, //To rework
         })
     }
 
@@ -115,6 +119,10 @@ impl Widget for &App {
 }
 
 impl App {
+    fn render_title_bar(&self, area: Rect, buf: &mut Buffer) {
+        todo!()
+    }
+
     fn render_selected_mode(&self, area: Rect, buf: &mut Buffer) {
         match self.mode {
             Mode::SelectionDeck => self.selection_mode.render(area, buf),
